@@ -1,4 +1,5 @@
 """Helper functions for Mail and Packages."""
+
 from __future__ import annotations
 
 import base64
@@ -6,19 +7,22 @@ import datetime
 import email
 import hashlib
 import imaplib
-import locale
 import logging
 import os
 import quopri
 import re
+import ssl
 import subprocess  # nosec
 import uuid
 from datetime import timezone
 from email.header import decode_header
 from shutil import copyfile, copytree, which
+from ssl import Purpose
 from typing import Any, List, Optional, Type, Union
 
 import aiohttp
+import dateparser
+import homeassistant.helpers.config_validation as cv
 from bs4 import BeautifulSoup
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -46,7 +50,6 @@ from .const import (
     AMAZON_HUB_SUBJECT,
     AMAZON_HUB_SUBJECT_SEARCH,
     AMAZON_IMG_PATTERN,
-    AMAZON_LANGS,
     AMAZON_ORDER,
     AMAZON_PACKAGES,
     AMAZON_PATTERN,
@@ -73,7 +76,9 @@ from .const import (
     CONF_DURATION,
     CONF_FOLDER,
     CONF_GENERATE_MP4,
+    CONF_IMAP_SECURITY,
     CONF_PATH,
+    CONF_VERIFY_SSL,
     DEFAULT_AMAZON_DAYS,
     OVERLAY,
     SENSOR_DATA,
@@ -81,6 +86,7 @@ from .const import (
     SHIPPERS,
 )
 
+NO_SSL = "Email will be accessed without encryption using this method and is not recommended."
 _LOGGER = logging.getLogger(__name__)
 
 # Config Flow Helpers
@@ -106,14 +112,33 @@ async def _check_ffmpeg() -> bool:
     return which("ffmpeg")
 
 
-async def _test_login(host: str, port: int, user: str, pwd: str) -> bool:
+async def _test_login(
+    host: str, port: int, user: str, pwd: str, security: str, verify: bool
+) -> bool:
     """Test IMAP login to specified server.
 
     Returns success boolean
     """
-    # Attempt to catch invalid mail server hosts
+    context = ssl.create_default_context()
+    # Catch invalid mail server / host names
     try:
-        account = imaplib.IMAP4_SSL(host, port)
+        if security == "SSL":
+            if not verify:
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+            else:
+                context = ssl.create_default_context(purpose=Purpose.SERVER_AUTH)
+            account = imaplib.IMAP4_SSL(host=host, port=port, ssl_context=context)
+        elif security == "startTLS":
+            context = ssl.create_default_context(purpose=Purpose.SERVER_AUTH)
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            account = imaplib.IMAP4(host=host, port=port)
+            account.starttls(context)
+        else:
+            _LOGGER.warning(NO_SSL)
+            account = imaplib.IMAP4(host=host, port=port)
     except Exception as err:
         _LOGGER.error("Error connecting into IMAP Server: %s", str(err))
         return False
@@ -151,12 +176,14 @@ def process_emails(hass: HomeAssistant, config: ConfigEntry) -> dict:
     pwd = config.get(CONF_PASSWORD)
     folder = config.get(CONF_FOLDER)
     resources = config.get(CONF_RESOURCES)
+    imap_security = config.get(CONF_IMAP_SECURITY)
+    verify_ssl = config.get(CONF_VERIFY_SSL)
 
     # Create the dict container
     data = {}
 
     # Login to email server and select the folder
-    account = login(host, port, user, pwd)
+    account = login(host, port, user, pwd, imap_security, verify_ssl)
 
     # Do not process if account returns false
     if not account:
@@ -186,7 +213,10 @@ def process_emails(hass: HomeAssistant, config: ConfigEntry) -> dict:
 
     # Only update sensors we're intrested in
     for sensor in resources:
-        fetch(hass, config, account, data, sensor)
+        try:
+            fetch(hass, config, account, data, sensor)
+        except Exception as err:
+            _LOGGER.error("Error updating sensor: %s reason: %s", sensor, err)
 
     # Copy image file to www directory if enabled
     if config.get(CONF_ALLOW_EXTERNAL):
@@ -332,7 +362,7 @@ def fetch(
     img_out_path = f"{hass.config.path()}/{config.get(CONF_PATH)}"
     gif_duration = config.get(CONF_DURATION)
     generate_mp4 = config.get(CONF_GENERATE_MP4)
-    amazon_fwds = config.get(CONF_AMAZON_FWDS)
+    amazon_fwds = cv.ensure_list_csv(config.get(CONF_AMAZON_FWDS))
     image_name = data[ATTR_IMAGE_NAME]
     amazon_image_name = data[ATTR_AMAZON_IMAGE]
     amazon_days = config.get(CONF_AMAZON_DAYS)
@@ -358,16 +388,16 @@ def fetch(
         )
     elif sensor == AMAZON_PACKAGES:
         count[sensor] = get_items(
-            account=account,
-            param=ATTR_COUNT,
-            fwds=amazon_fwds,
-            days=amazon_days,
+            account,
+            ATTR_COUNT,
+            amazon_fwds,
+            amazon_days,
         )
         count[AMAZON_ORDER] = get_items(
-            account=account,
-            param=ATTR_ORDER,
-            fwds=amazon_fwds,
-            days=amazon_days,
+            account,
+            ATTR_ORDER,
+            amazon_fwds,
+            amazon_days,
         )
     elif sensor == AMAZON_HUB:
         value = amazon_hub(account, amazon_fwds)
@@ -414,15 +444,29 @@ def fetch(
 
 
 def login(
-    host: str, port: int, user: str, pwd: str
+    host: str, port: int, user: str, pwd: str, security: str, verify: bool = True
 ) -> Union[bool, Type[imaplib.IMAP4_SSL]]:
     """Login to IMAP server.
 
     Returns account object
     """
-    # Catch invalid mail server / host names
     try:
-        account = imaplib.IMAP4_SSL(host, port)
+        if security == "SSL":
+            if not verify:
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+            else:
+                context = ssl.create_default_context(purpose=Purpose.SERVER_AUTH)
+            account = imaplib.IMAP4_SSL(host=host, port=port, ssl_context=context)
+        elif security == "startTLS":
+            context = ssl.create_default_context(purpose=Purpose.SERVER_AUTH)
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            account = imaplib.IMAP4(host=host, port=port)
+            account.starttls(context)
+        else:
+            account = imaplib.IMAP4(host=host, port=port)
 
     except Exception as err:
         _LOGGER.error("Network error while connecting to server: %s", str(err))
@@ -810,10 +854,12 @@ def resize_images(images: list, width: int, height: int) -> list:
             with open(image, "rb") as fd_img:
                 try:
                     img = Image.open(fd_img)
-                    img.thumbnail((width, height), resample=Image.LANCZOS)
+                    img.thumbnail((width, height), resample=Image.Resampling.LANCZOS)
 
                     # Add padding as needed
-                    img = ImageOps.pad(img, (width, height), method=Image.LANCZOS)
+                    img = ImageOps.pad(
+                        img, (width, height), method=Image.Resampling.LANCZOS
+                    )
                     # Crop to size
                     img = img.crop((0, 0, width, height))
 
@@ -928,7 +974,8 @@ def get_count(
             found.append(data[0])
 
     if (
-        ATTR_PATTERN
+        f"{'_'.join(sensor_type.split('_')[:-1])}_tracking" in SENSOR_DATA
+        and ATTR_PATTERN
         in SENSOR_DATA[f"{'_'.join(sensor_type.split('_')[:-1])}_tracking"].keys()
     ):
         track = SENSOR_DATA[f"{'_'.join(sensor_type.split('_')[:-1])}_tracking"][
@@ -1069,7 +1116,13 @@ def amazon_search(
             if server_response == "OK" and data[0] is not None:
                 count += len(data[0].split())
                 _LOGGER.debug("Amazon delivered email(s) found: %s", count)
-                get_amazon_image(data[0], account, image_path, hass, amazon_image_name)
+                get_amazon_image(
+                    data[0],
+                    account,
+                    image_path,
+                    hass,
+                    amazon_image_name,
+                )
 
     return count
 
@@ -1113,10 +1166,12 @@ def get_amazon_image(
 
     if img_url is not None:
         # Download the image we found
-        hass.add_job(download_img(img_url, image_path, image_name))
+        hass.add_job(download_img(hass, img_url, image_path, image_name))
 
 
-async def download_img(img_url: str, img_path: str, img_name: str) -> None:
+async def download_img(
+    hass: HomeAssistant, img_url: str, img_path: str, img_name: str
+) -> None:
     """Download image from url."""
     img_path = f"{img_path}amazon/"
     filepath = f"{img_path}{img_name}"
@@ -1131,9 +1186,9 @@ async def download_img(img_url: str, img_path: str, img_name: str) -> None:
             if "image" in content_type:
                 data = await resp.read()
                 _LOGGER.debug("Downloading image to: %s", filepath)
-                with open(filepath, "wb") as the_file:
-                    the_file.write(data)
-                    _LOGGER.debug("Amazon image downloaded")
+                the_file = await hass.async_add_executor_job(open, filepath, "wb")
+                the_file.write(data)
+                _LOGGER.debug("Amazon image downloaded")
 
 
 def _process_amazon_forwards(email_list: Union[List[str], None]) -> list:
@@ -1288,36 +1343,6 @@ def amazon_date_format(arrive_date: str, lang: str) -> tuple:
     return (arrive_date, "%A, %B %d")
 
 
-def amazon_date_lang(arrive_date: str) -> datetime.datetime | None:
-    """Return the datetime for the date based on language."""
-    time_format = None
-    new_arrive_date = None
-    dateobj = None
-
-    for lang in AMAZON_LANGS:
-        try:
-            locale.setlocale(locale.LC_TIME, lang)
-        except Exception as err:
-            _LOGGER.debug("Locale error: %s (%s)", err, lang)
-            continue
-
-        _LOGGER.debug("Arrive Date: %s", arrive_date)
-        new_arrive_date, time_format = amazon_date_format(arrive_date, lang)
-
-        try:
-            dateobj = datetime.datetime.strptime(new_arrive_date, time_format)
-            _LOGGER.debug("Valid date format found.")
-            break
-        except ValueError as err:
-            _LOGGER.debug(
-                "Invalid date format found for language %s. (%s)",
-                lang,
-                err,
-            )
-            continue
-    return dateobj
-
-
 def get_items(
     account: Type[imaplib.IMAP4_SSL],
     param: str = None,
@@ -1376,6 +1401,11 @@ def get_items(
                             )
                         else:
                             email_subject = decode_header(msg["subject"])[0][0]
+
+                        if not isinstance(email_subject, str):
+                            _LOGGER.debug("Converting subject to string.")
+                            email_subject = email_subject.decode("utf-8", "ignore")
+
                         _LOGGER.debug("Amazon Subject: %s", str(email_subject))
                         pattern = re.compile(r"[0-9]{3}-[0-9]{7}-[0-9]{7}")
 
@@ -1418,8 +1448,8 @@ def get_items(
                             arrive_date = arrive_date[0:3]
                             arrive_date = " ".join(arrive_date).strip()
 
-                            # Loop through all the langs for date format
-                            dateobj = amazon_date_lang(arrive_date)
+                            # Get the date object
+                            dateobj = dateparser.parse(arrive_date)
 
                             if (
                                 dateobj is not None

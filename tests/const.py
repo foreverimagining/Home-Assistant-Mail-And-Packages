@@ -8,6 +8,7 @@ FAKE_CONFIG_DATA_BAD = {
     "image_name": "mail_today.gif",
     "image_path": "/config/www/mail_and_packages/",
     "image_security": False,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -64,6 +65,7 @@ FAKE_CONFIG_DATA = {
     "image_name": "mail_today.gif",
     "image_path": "/config/www/mail_and_packages/",
     "image_security": True,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -117,6 +119,7 @@ FAKE_CONFIG_DATA = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_CONFIG_DATA_EXTERNAL = {
@@ -131,6 +134,7 @@ FAKE_CONFIG_DATA_EXTERNAL = {
     "image_name": "mail_today.gif",
     "image_path": "custom_components/mail_and_packages/images/",
     "image_security": True,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -178,12 +182,13 @@ FAKE_CONFIG_DATA_EXTERNAL = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_CONFIG_DATA_CORRECTED_EXTERNAL = {
     "allow_external": True,
     "amazon_days": 3,
-    "amazon_fwds": ["fakeuser@fake.email", "fakeuser2@fake.email"],
+    "amazon_fwds": "fakeuser@fake.email, fakeuser2@fake.email",
     "custom_img": False,
     "folder": '"INBOX"',
     "generate_mp4": False,
@@ -192,6 +197,7 @@ FAKE_CONFIG_DATA_CORRECTED_EXTERNAL = {
     "image_name": "mail_today.gif",
     "image_path": "custom_components/mail_and_packages/images/",
     "image_security": True,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -239,12 +245,13 @@ FAKE_CONFIG_DATA_CORRECTED_EXTERNAL = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_CONFIG_DATA_CORRECTED = {
     "allow_external": False,
     "amazon_days": 3,
-    "amazon_fwds": ["fakeuser@fake.email", "fakeuser2@fake.email"],
+    "amazon_fwds": "fakeuser@fake.email, fakeuser2@fake.email",
     "custom_img": False,
     "folder": '"INBOX"',
     "generate_mp4": False,
@@ -253,6 +260,7 @@ FAKE_CONFIG_DATA_CORRECTED = {
     "image_name": "mail_today.gif",
     "image_path": "custom_components/mail_and_packages/images/",
     "image_security": True,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -306,6 +314,7 @@ FAKE_CONFIG_DATA_CORRECTED = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_CONFIG_DATA_NO_PATH = {
@@ -316,6 +325,7 @@ FAKE_CONFIG_DATA_NO_PATH = {
     "gif_duration": 5,
     "host": "imap.test.email",
     "image_name": "mail_today.gif",
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -364,6 +374,7 @@ FAKE_CONFIG_DATA_NO_PATH = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_CONFIG_DATA_NO_RND = {
@@ -377,6 +388,7 @@ FAKE_CONFIG_DATA_NO_RND = {
     "image_name": "mail_today.gif",
     "image_path": "custom_components/mail_and_packages/images/",
     "image_security": False,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -420,6 +432,7 @@ FAKE_CONFIG_DATA_NO_RND = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_CONFIG_DATA_MP4 = {
@@ -432,6 +445,7 @@ FAKE_CONFIG_DATA_MP4 = {
     "image_name": "mail_today.gif",
     "image_path": "/config/custom_components/mail_and_packages/images/",
     "image_security": True,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -474,6 +488,7 @@ FAKE_CONFIG_DATA_MP4 = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_UPDATE_DATA = {
@@ -535,6 +550,7 @@ FAKE_CONFIG_DATA_MISSING_TIMEOUT = {
     "image_name": "mail_today.gif",
     "image_path": "/config/custom_components/mail_and_packages/images/",
     "image_security": True,
+    "imap_security": "SSL",
     "password": "suchfakemuchpassword",
     "port": 993,
     "resources": [
@@ -581,6 +597,7 @@ FAKE_CONFIG_DATA_MISSING_TIMEOUT = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_CONFIG_DATA_AMAZON_FWD_STRING = {
@@ -594,6 +611,7 @@ FAKE_CONFIG_DATA_AMAZON_FWD_STRING = {
     "image_name": "mail_today.gif",
     "image_path": "custom_components/mail_and_packages/images/",
     "image_security": True,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -641,8 +659,10 @@ FAKE_CONFIG_DATA_AMAZON_FWD_STRING = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 FAKE_CONFIG_DATA_CUSTOM_IMG = {
+    "amazon_days": 3,
     "allow_external": False,
     "amazon_fwds": ["fakeuser@fake.email", "fakeuser2@fake.email"],
     "custom_img": True,
@@ -654,6 +674,7 @@ FAKE_CONFIG_DATA_CUSTOM_IMG = {
     "image_name": "mail_today.gif",
     "image_path": "custom_components/mail_and_packages/images/",
     "image_security": True,
+    "imap_security": "SSL",
     "imap_timeout": 30,
     "password": "suchfakemuchpassword",
     "port": 993,
@@ -702,6 +723,7 @@ FAKE_CONFIG_DATA_CUSTOM_IMG = {
     ],
     "scan_interval": 20,
     "username": "user@fake.email",
+    "verify_ssl": False,
 }
 
 FAKE_UPDATE_DATA_REDACTED = {
@@ -802,4 +824,65 @@ FAKE_UPDATE_DATA_BIN = {
     "gls_delivering": 1,
     "gls_packages": 3,
     "gls_tracking": ["51687952111"],
+}
+FAKE_CONFIG_DATA_V4_MIGRATE = {
+    "allow_external": True,
+    "amazon_fwds": ['""'],
+    "custom_img": False,
+    "folder": '"INBOX"',
+    "generate_mp4": False,
+    "gif_duration": 5,
+    "host": "imap.test.email",
+    "image_name": "mail_today.gif",
+    "image_path": "custom_components/mail_and_packages/images/",
+    "image_security": True,
+    "imap_security": "SSL",
+    "imap_timeout": 30,
+    "password": "suchfakemuchpassword",
+    "port": 993,
+    "resources": [
+        "zpackages_delivered",
+        "zpackages_transit",
+        "amazon_delivered",
+        "amazon_hub",
+        "amazon_packages",
+        "capost_delivered",
+        "capost_delivering",
+        "capost_packages",
+        "dhl_delivered",
+        "dhl_delivering",
+        "dhl_packages",
+        "fedex_delivered",
+        "fedex_delivering",
+        "fedex_packages",
+        "hermes_delivered",
+        "hermes_delivering",
+        "mail_updated",
+        "royal_delivered",
+        "royal_delivering",
+        "ups_delivered",
+        "ups_delivering",
+        "ups_packages",
+        "usps_delivered",
+        "usps_delivering",
+        "usps_mail",
+        "usps_packages",
+        "auspost_delivered",
+        "auspost_delivering",
+        "auspost_packages",
+        "poczta_polska_delivering",
+        "poczta_polska_packages",
+        "inpost_pl_delivered",
+        "inpost_pl_delivering",
+        "inpost_pl_packages",
+        "dpd_com_pl_delivered",
+        "dpd_com_pl_delivering",
+        "dpd_com_pl_packages",
+        "gls_delivered",
+        "gls_delivering",
+        "gls_packages",
+    ],
+    "scan_interval": 20,
+    "username": "user@fake.email",
+    "verify_ssl": False,
 }

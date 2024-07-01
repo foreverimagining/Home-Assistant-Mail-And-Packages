@@ -26,9 +26,11 @@ from .const import (
     CONF_FOLDER,
     CONF_GENERATE_MP4,
     CONF_IMAGE_SECURITY,
+    CONF_IMAP_SECURITY,
     CONF_IMAP_TIMEOUT,
     CONF_PATH,
     CONF_SCAN_INTERVAL,
+    CONF_VERIFY_SSL,
     DEFAULT_ALLOW_EXTERNAL,
     DEFAULT_AMAZON_DAYS,
     DEFAULT_AMAZON_FWDS,
@@ -45,6 +47,7 @@ from .const import (
 )
 from .helpers import _check_ffmpeg, _test_login, get_resources, login
 
+IMAP_SECURITY = ["none", "startTLS", "SSL"]
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -65,7 +68,7 @@ async def _check_amazon_forwards(forwards: str) -> tuple:
         amazon_forwards_list = forwards.split(",")
 
     # No forwards
-    elif forwards in ["", "(none)", ""]:
+    elif forwards in ["", "(none)", '""']:
         amazon_forwards_list = []
 
     # If only one address append it to the list
@@ -123,9 +126,11 @@ async def _validate_user_input(user_input: dict) -> tuple:
     return errors, user_input
 
 
-def _get_mailboxes(host: str, port: int, user: str, pwd: str) -> list:
+def _get_mailboxes(
+    host: str, port: int, user: str, pwd: str, security: str, verify: bool
+) -> list:
     """Get list of mailbox folders from mail server."""
-    account = login(host, port, user, pwd)
+    account = login(host, port, user, pwd, security, verify)
 
     status, folderlist = account.list()
     mailboxes = []
@@ -159,10 +164,14 @@ def _get_schema_step_1(user_input: list, default_dict: list) -> Any:
 
     return vol.Schema(
         {
-            vol.Required(CONF_HOST, default=_get_default(CONF_HOST)): str,
-            vol.Required(CONF_PORT, default=_get_default(CONF_PORT)): vol.Coerce(int),
-            vol.Required(CONF_USERNAME, default=_get_default(CONF_USERNAME)): str,
-            vol.Required(CONF_PASSWORD, default=_get_default(CONF_PASSWORD)): str,
+            vol.Required(CONF_HOST, default=_get_default(CONF_HOST)): cv.string,
+            vol.Required(CONF_PORT, default=_get_default(CONF_PORT, 993)): cv.port,
+            vol.Required(CONF_USERNAME, default=_get_default(CONF_USERNAME)): cv.string,
+            vol.Required(CONF_PASSWORD, default=_get_default(CONF_PASSWORD)): cv.string,
+            vol.Required(
+                CONF_IMAP_SECURITY, default=_get_default(CONF_IMAP_SECURITY)
+            ): vol.In(IMAP_SECURITY),
+            vol.Required(CONF_VERIFY_SSL, default=_get_default(CONF_VERIFY_SSL)): bool,
         }
     )
 
@@ -184,29 +193,35 @@ def _get_schema_step_2(data: list, user_input: list, default_dict: list) -> Any:
                     data[CONF_PORT],
                     data[CONF_USERNAME],
                     data[CONF_PASSWORD],
+                    data[CONF_IMAP_SECURITY],
+                    data[CONF_VERIFY_SSL],
                 )
             ),
             vol.Required(
                 CONF_RESOURCES, default=_get_default(CONF_RESOURCES)
             ): cv.multi_select(get_resources()),
-            vol.Optional(CONF_AMAZON_FWDS, default=_get_default(CONF_AMAZON_FWDS)): str,
+            vol.Optional(
+                CONF_AMAZON_FWDS, default=_get_default(CONF_AMAZON_FWDS)
+            ): cv.string,
             vol.Optional(CONF_AMAZON_DAYS, default=_get_default(CONF_AMAZON_DAYS)): int,
             vol.Optional(
                 CONF_SCAN_INTERVAL, default=_get_default(CONF_SCAN_INTERVAL)
-            ): vol.All(vol.Coerce(int)),
+            ): vol.All(vol.Coerce(int), vol.Range(min=5)),
             vol.Optional(
                 CONF_IMAP_TIMEOUT, default=_get_default(CONF_IMAP_TIMEOUT)
-            ): vol.All(vol.Coerce(int)),
+            ): vol.All(vol.Coerce(int), vol.Range(min=10)),
             vol.Optional(
                 CONF_DURATION, default=_get_default(CONF_DURATION)
             ): vol.Coerce(int),
             vol.Optional(
                 CONF_GENERATE_MP4, default=_get_default(CONF_GENERATE_MP4)
-            ): bool,
+            ): cv.boolean,
             vol.Optional(
                 CONF_ALLOW_EXTERNAL, default=_get_default(CONF_ALLOW_EXTERNAL)
-            ): bool,
-            vol.Optional(CONF_CUSTOM_IMG, default=_get_default(CONF_CUSTOM_IMG)): bool,
+            ): cv.boolean,
+            vol.Optional(
+                CONF_CUSTOM_IMG, default=_get_default(CONF_CUSTOM_IMG)
+            ): cv.boolean,
         }
     )
 
@@ -225,7 +240,7 @@ def _get_schema_step_3(user_input: list, default_dict: list) -> Any:
             vol.Optional(
                 CONF_CUSTOM_IMG_FILE,
                 default=_get_default(CONF_CUSTOM_IMG_FILE, DEFAULT_CUSTOM_IMG_FILE),
-            ): str,
+            ): cv.string,
         }
     )
 
@@ -234,7 +249,7 @@ def _get_schema_step_3(user_input: list, default_dict: list) -> Any:
 class MailAndPackagesFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for Mail and Packages."""
 
-    VERSION = 4
+    VERSION = 7
     CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
     def __init__(self):
@@ -253,6 +268,8 @@ class MailAndPackagesFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input[CONF_PORT],
                 user_input[CONF_USERNAME],
                 user_input[CONF_PASSWORD],
+                user_input[CONF_IMAP_SECURITY],
+                user_input[CONF_VERIFY_SSL],
             )
             if not valid:
                 self._errors["base"] = "communication"
@@ -268,6 +285,8 @@ class MailAndPackagesFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         # Defaults
         defaults = {
             CONF_PORT: DEFAULT_PORT,
+            CONF_IMAP_SECURITY: "SSL",
+            CONF_VERIFY_SSL: True,
         }
 
         return self.async_show_form(
@@ -368,6 +387,8 @@ class MailAndPackagesOptionsFlow(config_entries.OptionsFlow):
                 user_input[CONF_PORT],
                 user_input[CONF_USERNAME],
                 user_input[CONF_PASSWORD],
+                user_input[CONF_IMAP_SECURITY],
+                user_input[CONF_VERIFY_SSL],
             )
             if not valid:
                 self._errors["base"] = "communication"

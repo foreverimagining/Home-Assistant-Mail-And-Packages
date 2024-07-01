@@ -1,4 +1,5 @@
 """Constants for Mail and Packages."""
+
 from __future__ import annotations
 
 from typing import Final
@@ -53,6 +54,8 @@ CONF_IMAP_TIMEOUT = "imap_timeout"
 CONF_GENERATE_MP4 = "generate_mp4"
 CONF_AMAZON_FWDS = "amazon_fwds"
 CONF_AMAZON_DAYS = "amazon_days"
+CONF_VERIFY_SSL = "verify_ssl"
+CONF_IMAP_SECURITY = "imap_security"
 
 # Defaults
 DEFAULT_CAMERA_NAME = "Mail USPS Camera"
@@ -61,9 +64,9 @@ DEFAULT_PORT = "993"
 DEFAULT_FOLDER = '"INBOX"'
 DEFAULT_PATH = "custom_components/mail_and_packages/images/"
 DEFAULT_IMAGE_SECURITY = True
-DEFAULT_IMAP_TIMEOUT = 30
+DEFAULT_IMAP_TIMEOUT = 60
 DEFAULT_GIF_DURATION = 5
-DEFAULT_SCAN_INTERVAL = 5
+DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_GIF_FILE_NAME = "mail_today.gif"
 DEFAULT_AMAZON_FWDS = "(none)"
 DEFAULT_ALLOW_EXTERNAL = False
@@ -84,6 +87,7 @@ AMAZON_DOMAINS = [
     "amazon.es",
     "amazon.fr",
     "amazon.ae",
+    "amazon.nl",
 ]
 AMAZON_DELIVERED_SUBJECT = [
     "Delivered: Your",
@@ -91,6 +95,8 @@ AMAZON_DELIVERED_SUBJECT = [
     "Dostarczono:",
     "Geliefert:",
     "Livré",
+    "Entregado:",
+    "Bezorgd:",
 ]
 AMAZON_SHIPMENT_TRACKING = [
     "shipment-tracking",
@@ -98,6 +104,8 @@ AMAZON_SHIPMENT_TRACKING = [
     "confirmar-envio",
     "versandbestaetigung",
     "confirmation-commande",
+    "verzending-volgen",
+    "update-bestelling",
 ]
 AMAZON_EMAIL = "order-update@"
 AMAZON_PACKAGES = "amazon_packages"
@@ -108,9 +116,13 @@ AMAZON_IMG_PATTERN = (
 )
 AMAZON_HUB = "amazon_hub"
 AMAZON_HUB_CODE = "amazon_hub_code"
-AMAZON_HUB_EMAIL = ["thehub@amazon.com", "order-update@amazon.com"]
+AMAZON_HUB_EMAIL = [
+    "thehub@amazon.com",
+    "order-update@amazon.com",
+    "amazonlockers@amazon.com",
+]
 AMAZON_HUB_SUBJECT = "ready for pickup from Amazon Hub Locker"
-AMAZON_HUB_SUBJECT_SEARCH = "(You have a package to pick up)(.*)(\\d{6})"
+AMAZON_HUB_SUBJECT_SEARCH = "(a package to pick up)(.*)(\\d{6})"
 AMAZON_HUB_BODY = "(Your pickup code is <b>)(\\d{6})"
 AMAZON_TIME_PATTERN = [
     "will arrive:",
@@ -124,6 +136,7 @@ AMAZON_TIME_PATTERN = [
     "Entrega:",
     "A chegar:",
     "Arrivée :",
+    "Verwachte bezorgdatum:",
 ]
 AMAZON_TIME_PATTERN_END = [
     "Previously expected:",
@@ -132,11 +145,13 @@ AMAZON_TIME_PATTERN_END = [
     "Per tracciare il tuo pacco",
     "View or manage order",
     "Acompanhar",
-    "Sguimiento",
+    "Seguimiento",
     "Verfolge deine(n) Artikel",
     "Lieferung verfolgen",
     "Ihr Paket verfolgen",
     "Suivre",
+    "Volg je pakket",
+    "Je pakket volgen",
 ]
 AMAZON_EXCEPTION_SUBJECT = "Delivery update:"
 AMAZON_EXCEPTION_BODY = "running late"
@@ -185,6 +200,15 @@ SENSOR_DATA = {
             "USPS Informed Delivery",
         ],
         "subject": ["Your Daily Digest"],
+    },
+    "usps_mail_delivered": {
+        "email": [
+            "USPSInformedDelivery@usps.gov",
+            "USPSInformeddelivery@email.informeddelivery.usps.com",
+            "USPSInformeddelivery@informeddelivery.usps.com",
+            "USPS Informed Delivery",
+        ],
+        "subject": ["Your Mail Was Delivered"],
     },
     # UPS
     "ups_delivered": {
@@ -250,16 +274,20 @@ SENSOR_DATA = {
             "NoReply.ODD@dhl.com",
             "noreply@dhl.de",
             "pl.no.reply@dhl.com",
+            "support@dhl.com",
         ],
         "subject": [
             "DHL On Demand Delivery",
             "Powiadomienie o przesyłce",
             "Paket wurde zugestellt",
+            "DHL Shipment Notification",
         ],
         "body": [
             "has been delivered",
             "została doręczona",
             "ist angekommen",
+            'Notification for shipment event group "Delivered',
+            " - Delivered - ",
         ],
     },
     "dhl_delivering": {
@@ -268,17 +296,21 @@ SENSOR_DATA = {
             "NoReply.ODD@dhl.com",
             "noreply@dhl.de",
             "pl.no.reply@dhl.com",
+            "support@dhl.com",
         ],
         "subject": [
             "DHL On Demand Delivery",
             "Paket kommt heute",
             "Paket wird gleich zugestellt",
             "Powiadomienie o przesyłce",
+            "DHL Shipment Notification",
         ],
         "body": [
             "scheduled for delivery TODAY",
             "zostanie dziś do Państwa doręczona",
             "wird Ihnen heute",
+            " - Shipment is out with courier for delivery - ",
+            "Shipment is scheduled for delivery",
             "voraussichtlich innerhalb",
         ],
     },
@@ -537,15 +569,37 @@ SENSOR_DATA = {
     },
     "intelcom_tracking": {"pattern": ["INTLCMD[0-9]{9}"]},
     # Walmart
+    "walmart_delivering": {
+        "email": ["help@walmart.com"],
+        "subject": ["Out for delivery"],
+    },
     "walmart_delivered": {
         "email": ["help@walmart.com"],
-        "subject": ["Your order was delivered", "Some of your items were delivered"],
+        "subject": [
+            "Your order was delivered",
+            "Some of your items were delivered",
+            "Delivered:",
+        ],
     },
     "walmart_exception": {
         "email": ["help@walmart.com"],
         "subject": ["delivery is delayed"],
     },
-    "walmart_tracking": {"pattern": ["#[0-9]{7}-[0-9]{7}"]},
+    "walmart_tracking": {"pattern": ["#[0-9]{7}-[0-9]{7,8}"]},
+    # BuildingLink
+    "buildinglink_delivered": {
+        "email": ["notify@buildinglink.com"],
+        "subject": [
+            "Your Amazon order has arrived",
+            "Your USPS delivery has arrived",
+            "Your UPS delivery has arrived",
+            "Your FEDEX delivery has arrived",
+            "You have a package delivery",
+            "You have a DHL delivery",
+            "You have an envelope",
+        ],
+    },
+    "buildinglink_tracking": {},
     # Post NL
     "post_nl_delivering": {
         "email": ["noreply@notificatie.postnl.nl"],
@@ -568,6 +622,7 @@ SENSOR_DATA = {
         ],
         "subject": [
             "Ein Brief kommt in Kürze bei Ihnen an",
+            "Ein Brief ist unterwegs zu Ihnen",
         ],
     },
     "post_de_delivered": {},
@@ -970,6 +1025,12 @@ SENSOR_TYPES: Final[dict[str, SensorEntityDescription]] = {
         key="intelcom_packages",
     ),
     # Walmart
+    "walmart_delivering": SensorEntityDescription(
+        name="Mail Walmart Delivering",
+        native_unit_of_measurement="package(s)",
+        icon="mdi:truck-delivery",
+        key="walmart_delivering",
+    ),
     "walmart_delivered": SensorEntityDescription(
         name="Mail Walmart Delivered",
         native_unit_of_measurement="packages",
@@ -981,6 +1042,13 @@ SENSOR_TYPES: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement="packages",
         icon="mdi:archive-alert",
         key="walmart_exception",
+    ),
+    # BuildingLink
+    "buildinglink_delivered": SensorEntityDescription(
+        name="Mail BuildingLink Delivered",
+        native_unit_of_measurement="package(s)",
+        icon="mdi:package-variant-closed",
+        key="buildinglink_delivered",
     ),
     # Post NL
     "post_nl_delivering": SensorEntityDescription(
@@ -1068,6 +1136,11 @@ BINARY_SENSORS: Final[dict[str, BinarySensorEntityDescription]] = {
         name="Amazon Image Updated",
         key="amazon_update",
         device_class=BinarySensorDeviceClass.UPDATE,
+    ),
+    "usps_mail_delivered": BinarySensorEntityDescription(
+        name="USPS Mail Delivered",
+        key="usps_mail_delivered",
+        entity_registry_enabled_default=False,
     ),
 }
 
